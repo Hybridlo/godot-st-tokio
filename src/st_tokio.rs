@@ -95,12 +95,14 @@ impl TokioRuntime {
     /// Expects for a main loop to be initialized, which means
     /// it's usually initialized on the first call to [`spawn`][Self::spawn]
     /// or [`spawn_signal`][Self::spawn_signal]
-    ///
-    /// Authors note: emits an error on gdextension load. Again, there might
-    /// be a better way to do this over a singleton, but I'm not sure what
-    /// way is
     pub fn singleton() -> Option<Gd<TokioRuntime>> {
-        match Engine::singleton().get_singleton(Self::SINGLETON) {
+
+        let singleton_option = match Engine::singleton().has_singleton(Self::SINGLETON) {
+            true => Engine::singleton().get_singleton(Self::SINGLETON),
+            false => None
+        };
+
+        match singleton_option {
             Some(singleton) => Some(singleton.cast::<Self>()),
             None => {
                 let singleton = TokioRuntime::init_and_start()?;
@@ -225,9 +227,11 @@ impl TokioRuntime {
         let mut engine = Engine::singleton();
 
         // Here is where we free our async runtime singleton from memory.
-        if let Some(async_singleton) = engine.get_singleton(TokioRuntime::SINGLETON) {
-            engine.unregister_singleton(TokioRuntime::SINGLETON);
-            async_singleton.free();
+        if engine.has_singleton(TokioRuntime::SINGLETON) {
+            if let Some(async_singleton) = engine.get_singleton(TokioRuntime::SINGLETON) {
+                engine.unregister_singleton(TokioRuntime::SINGLETON);
+                async_singleton.free();
+            }
         }
     }
 }
